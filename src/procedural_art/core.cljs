@@ -9,39 +9,6 @@
   [label s]
   (str label ": " s "\n"))
 
-(def sierpinski-arrowhead
-  {:start [:a]
-   :rules {:a [:b :- :a :- :b]
-           :b [:a :+ :b :+ :a]
-           :- [:-]
-           :+ [:+]}})
-
-(def koch-curve
-  {:start [:f]
-   :rules {:f [:f :+ :f :- :f :- :f :+ :f]
-           :+ [:+]
-           :- [:-]}})
-
-(def l-system koch-curve)
-
-(defn expand-symbol
-  [symbol]
-  (get (:rules l-system) symbol))
-
-(defn next-symbols
-  [symbols]
-  (mapcat expand-symbol symbols))
-
-(defn transform-n-times
-  [f n start]
-  (->> (repeat n 1)
-       (reduce (fn [prior _] (f prior)) start)))
-
-
-
-(defn to-radians [degrees]
-  (* degrees (/ Math/PI 180)))
-
 (defn add-location-to-history
   [{:keys [pos history] :as state}]
   (update state :history #(conj % pos)))
@@ -49,8 +16,8 @@
 (defn turn [state angle]
   (update state :heading #(+ angle %)))
 
-(defn left [state] (turn state (to-radians 90)))
-(defn right [state] (turn state (to-radians -90)))
+(defn to-radians [degrees]
+  (* degrees (/ Math/PI 180)))
 
 (defn forward
   [{:keys [heading step-size] :as state}]
@@ -61,9 +28,51 @@
         (update-in [:pos :x] #(+ % dx))
         (update-in [:pos :y] #(+ % dy)))))
 
+(defn left [state] (turn state (to-radians 90)))
+(defn right [state] (turn state (to-radians -90)))
+
+(def koch-curve
+  {:start [:f]
+   :rules {:f [:f :+ :f :- :f :- :f :+ :f]
+           :+ [:+]
+           :- [:-]}
+   :handlers {:f forward
+              :+ left
+              :- right}})
+
+(def sierpinski-arrowhead
+  {:start [:a]
+   :rules {:a [:b :- :a :- :b]
+           :b [:a :+ :b :+ :a]
+           :- [:-]
+           :+ [:+]}
+   :handlers {:a forward
+              :b forward
+              :- (fn [state] (turn state (to-radians 60)))
+              :+ (fn [state] (turn state (to-radians -60)))}})
+
+(defn expand-symbol
+  [state symbol]
+  (get-in state [:l-system :rules symbol]))
+
+(defn next-symbols
+  [symbols]
+  (mapcat expand-symbol symbols))
+
+(defn make-symbols-iterator
+  [state]
+  (let [rules (get-in state [:l-system :rules])]
+    (fn [symbols]
+      (mapcat #(rules %) symbols))))
+
+(defn transform-n-times
+  [f n start]
+  (->> (repeat n 1)
+       (reduce (fn [prior _] (f prior)) start)))
+
 (defn apply-move-to-state
   [state move]
-  (let [{:keys [handlers]} state
+  (let [handlers (get-in state [:l-system :handlers])
         action (move handlers)]
     (-> state
         action)))
@@ -81,17 +90,12 @@
        (map #(name %))
        (clojure.string/join " ")))
 
-(def handlers
-  {:f forward
-   :+ left
-   :- right})
-
 (def default-state
   {:pos {:x 0 :y 0}
    :heading 0
    :step-size 1
    :history nil
-   :handlers handlers})
+   :l-system koch-curve})
 
 (defn view-pos
   [idx {:keys [x y]}]
@@ -114,25 +118,29 @@
           :fill fill} t])
 
 (defn polyline [point-list]
-  [:polyline {:fill "none"
-              :stroke "black"
-              :points (->> point-list
-                           (map (fn [{:keys [x y]}]
-                                  (str x "," y)))
-                           (clojure.string/join " "))}])
+  (if (> 2 (count point-list))
+    nil
+    [:polyline {:fill "none"
+                :stroke "black"
+                :points (->> point-list
+                             (map (fn [{:keys [x y]}]
+                                    (str x "," y)))
+                             (clojure.string/join " "))}]))
 (def svg-side "300")
 
-(defn svg-wrapper [& body]
+(defn svg-wrapper [body]
   [:svg {:version "1.1"
          :baseProfile "full"
          :width svg-side
          :height svg-side
-         :xmlns "http://www.w3.org/2000/svg"} body])
+         :xmlns "http://www.w3.org/2000/svg"}
+   body])
 
-(defn svg-view [& body]
+(defn svg-view [body]
   [:svg {:width svg-side
          :height svg-side
-         :viewBox (str "0 0 " svg-side " " svg-side)} body])
+         :viewBox (str "0 0 " svg-side " " svg-side)}
+   body])
 
 (defn extract-points [state]
   (cons (:pos state) (:history state)))
@@ -154,8 +162,8 @@
 (defn state->svg [state]
   (let [points (extract-points state)
         {:keys [max-x max-y]} (get-max points)
-        dv (str (max max-x max-y))
-        scaler (make-point-scaler (/ svg-side dv))]
+        max-coord (max max-x max-y 1)
+        scaler (make-point-scaler (/ (js/parseInt svg-side) max-coord))]
     (svg-wrapper (svg-view (->> points
                                 (map scaler)
                                 polyline)))))
@@ -166,26 +174,31 @@
      [:div "History"]
      (map-indexed view-pos points)]))
 
-(defn state-debug []
-  (let [{:keys [pos heading history step-size] :as state} @app-state]
-    [:div
-     [:h1 "System Debug"]
-     [:div (label-str "Heading" heading)]
-     [:div (label-str "Step Size" step-size)]
-     (state->svg state)]))
+(defn show-debug [{:keys [heading step-size] :as state}]
+  [:div 
+   [:h1 "System Debug"]
+   [:div (label-str "Heading" heading)]
+   [:div (label-str "Step Size" step-size)]
+   (show-history state)])
 
-(reagent/render-component [state-debug]
+(defn page-l-system []
+  (let [state @app-state]
+    [:div
+     (state->svg state)
+;     (show-debug state)
+     ]))
+
+(reagent/render-component [page-l-system]
                           (. js/document (getElementById "app")))
 
-(def moves-from-iteration
-  (transform-n-times next-symbols 4 [:f]))
+(def test-moves (transform-n-times (make-symbols-iterator default-state) 4 [:f]))
+(def test-state (apply-moves default-state
+                             test-moves))
 
-(def sample-moves moves-from-iteration)
-
-(reset! app-state (apply-moves default-state sample-moves))
+(reset! app-state test-state)
 
 (defn on-js-reload []
-  (reset! app-state (apply-moves default-state sample-moves))
+  (reset! app-state test-state)
 
   ;; optionally touch your app-state to force rerendering depending on
   ;; your application
