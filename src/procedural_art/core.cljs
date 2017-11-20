@@ -1,5 +1,6 @@
 (ns procedural-art.core
-    (:require [reagent.core :as reagent :refer [atom]]))
+    (:require [reagent.core :as reagent :refer [atom]]
+              ))
 
 (enable-console-print!)
 
@@ -37,8 +38,8 @@
            :+ [:+]
            :- [:-]}
    :handlers {:f forward
-              :+ left
-              :- right}})
+              :+ (fn [state] (turn state (to-radians 90)))
+              :- (fn [state] (turn state (to-radians -90)))}})
 
 (def sierpinski-arrowhead
   {:start [:a]
@@ -48,8 +49,17 @@
            :+ [:+]}
    :handlers {:a forward
               :b forward
-              :- (fn [state] (turn state (to-radians 60)))
-              :+ (fn [state] (turn state (to-radians -60)))}})
+              :+ (fn [state] (turn state (to-radians 60)))
+              :- (fn [state] (turn state (to-radians -60)))}})
+
+; dragon-curve not working
+(def dragon-curve
+  {:start [:f :x]
+   :rules {:x [:x :+ :y :f :+]
+           :y [:- :f :x :- :y]}
+   :handlers {:f forward
+              :+ (fn [state] (turn state (to-radians 90)))
+              :- (fn [state] (turn state (to-radians -90)))}})
 
 (defn expand-symbol
   [state symbol]
@@ -60,8 +70,9 @@
   (mapcat expand-symbol symbols))
 
 (defn make-symbols-iterator
-  [state]
-  (let [rules (get-in state [:l-system :rules])]
+  [lsystem]
+  (println lsystem)
+  (let [rules (get lsystem :rules)]
     (fn [symbols]
       (mapcat #(rules %) symbols))))
 
@@ -71,16 +82,16 @@
        (reduce (fn [prior _] (f prior)) start)))
 
 (defn apply-move-to-state
-  [state move]
-  (let [handlers (get-in state [:l-system :handlers])
+  [state l-system move]
+  (let [handlers (get l-system :handlers)
         action (move handlers)]
     (-> state
         action)))
 
 (defn apply-moves
-  [start-state moves]
+  [start-state l-system moves]
   (reduce (fn [state move]
-            (apply-move-to-state state move))
+            (apply-move-to-state state l-system move))
           start-state
           moves))
 
@@ -89,13 +100,6 @@
   (->> symbols
        (map #(name %))
        (clojure.string/join " ")))
-
-(def default-state
-  {:pos {:x 0 :y 0}
-   :heading 0
-   :step-size 1
-   :history nil
-   :l-system koch-curve})
 
 (defn view-pos
   [idx {:keys [x y]}]
@@ -184,23 +188,27 @@
 (defn page-l-system []
   (let [state @app-state]
     [:div
-     (state->svg state)
-;     (show-debug state)
-     ]))
+     (state->svg state)]))
 
 (reagent/render-component [page-l-system]
                           (. js/document (getElementById "app")))
 
-(def test-moves (transform-n-times (make-symbols-iterator default-state) 4 [:f]))
-(def test-state (apply-moves default-state
-                             test-moves))
+(def default-state
+  {:pos {:x 0 :y 0}
+   :heading 0
+   :step-size 1
+   :history nil})
 
-(reset! app-state test-state)
+(defn generate-system
+  "take a system + params, return a state"
+  [l-system iterations]
+  (let [next-symbols (make-symbols-iterator l-system)
+        moves (transform-n-times next-symbols iterations (:start l-system))]
+    (apply-moves default-state l-system moves)))
+
+(def test-gen (generate-system koch-curve 4))
+
+(reset! app-state test-gen)
 
 (defn on-js-reload []
-  (reset! app-state test-state)
-
-  ;; optionally touch your app-state to force rerendering depending on
-  ;; your application
-  ;; (swap! app-state update-in [:__figwheel_counter] inc)
-)
+  (reset! app-state test-gen))
