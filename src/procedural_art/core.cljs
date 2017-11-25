@@ -1,6 +1,14 @@
 (ns procedural-art.core
     (:require [reagent.core :as reagent :refer [atom]]
-              ))
+              [procedural-art.lsystems :as l]
+              [procedural-art.svg :as s]
+              [procedural-art.view :as v]))
+
+; parts: lsystem
+;; logic for iterating sequence
+;; logic for applying rules to 
+; views - components: history, svg-scene,
+; svg - svg, circle, rect, polyline
 
 (enable-console-print!)
 
@@ -40,6 +48,7 @@
    :handlers {:f forward
               :+ (fn [state] (turn state (to-radians 90)))
               :- (fn [state] (turn state (to-radians -90)))}})
+              :+ (fn [{:keys [angle] :as state}] (turn state (to-radians angle)))
 
 (def sierpinski-arrowhead
   {:start [:a]
@@ -61,134 +70,34 @@
               :+ (fn [state] (turn state (to-radians 90)))
               :- (fn [state] (turn state (to-radians -90)))}})
 
-(defn expand-symbol
-  [state symbol]
-  (get-in state [:l-system :rules symbol]))
-
-(defn next-symbols
-  [symbols]
-  (mapcat expand-symbol symbols))
-
 (defn make-symbols-iterator
-  [lsystem]
-  (println lsystem)
-  (let [rules (get lsystem :rules)]
-    (fn [symbols]
-      (mapcat #(rules %) symbols))))
-
-(defn transform-n-times
-  [f n start]
-  (->> (repeat n 1)
-       (reduce (fn [prior _] (f prior)) start)))
+  "use the l-system rules to create a function to iterate symbols"
+  [rules]
+  (fn [symbols]
+    (mapcat #(rules %) symbols)))
 
 (defn apply-move-to-state
-  [state l-system move]
-  (let [handlers (get l-system :handlers)
-        action (move handlers)]
-    (-> state
-        action)))
+  [state handlers move]
+  (let [action (move handlers)]
+    (action state)))
 
 (defn apply-moves
-  [start-state l-system moves]
+  [start-state handlers moves]
   (reduce (fn [state move]
-            (apply-move-to-state state l-system move))
+            (apply-move-to-state state handlers move))
           start-state
           moves))
 
-(defn debug-render
-  [symbols]
-  (->> symbols
-       (map #(name %))
-       (clojure.string/join " ")))
-
-(defn view-pos
-  [idx {:keys [x y]}]
-  (let [s (str "<" x ", " y ">")]
-    [:div {:key idx} s]))
-
-(defn rect [width height color]
-  [:rect {:width width
-          :height height
-          :fill color}])
-
-(defn circle [cx cy r fill]
-  [:circle {:cx cx :cy cy :r r :fill fill}])
-
-(defn text [t x y font-size text-anchor fill]
-  [:text {:x x
-          :y y
-          :font-size font-size
-          :text-anchor text-anchor
-          :fill fill} t])
-
-(defn polyline [point-list]
-  (if (> 2 (count point-list))
-    nil
-    [:polyline {:fill "none"
-                :stroke "black"
-                :points (->> point-list
-                             (map (fn [{:keys [x y]}]
-                                    (str x "," y)))
-                             (clojure.string/join " "))}]))
-(def svg-side "300")
-
-(defn svg-wrapper [body]
-  [:svg {:version "1.1"
-         :baseProfile "full"
-         :width svg-side
-         :height svg-side
-         :xmlns "http://www.w3.org/2000/svg"}
-   body])
-
-(defn svg-view [body]
-  [:svg {:width svg-side
-         :height svg-side
-         :viewBox (str "0 0 " svg-side " " svg-side)}
-   body])
-
-(defn extract-points [state]
-  (cons (:pos state) (:history state)))
-
-(defn get-max [points]
-  (reduce (fn [{:keys [max-x max-y]} {:keys [x y]}]
-            {:max-x (if (> x max-x) x max-x)
-             :max-y (if (> y max-y) y max-y)})
-          {:max-x 0 :max-y 0}
-          points))
-
-(defn make-point-scaler [scalar]
-  (fn [p]
-    (reduce (fn [result [k v]]
-              (assoc result k (* scalar v)))
-            {}
-            p)))
-
-(defn state->svg [state]
-  (let [points (extract-points state)
-        {:keys [max-x max-y]} (get-max points)
-        max-coord (max max-x max-y 1)
-        scaler (make-point-scaler (/ (js/parseInt svg-side) max-coord))]
-    (svg-wrapper (svg-view (->> points
-                                (map scaler)
-                                polyline)))))
-
-(defn show-history [state]
-  (let [points (extract-points state)]
-    [:div
-     [:div "History"]
-     (map-indexed view-pos points)]))
-
-(defn show-debug [{:keys [heading step-size] :as state}]
-  [:div 
-   [:h1 "System Debug"]
-   [:div (label-str "Heading" heading)]
-   [:div (label-str "Step Size" step-size)]
-   (show-history state)])
+(defn evt-set-angle
+  [e]
+  (let [val (.. e -target -value)]
+    (swap! app-state assoc :angle val)))
 
 (defn page-l-system []
   (let [state @app-state]
     [:div
      (state->svg state)]))
+     [:div.controls
 
 (reagent/render-component [page-l-system]
                           (. js/document (getElementById "app")))
@@ -200,11 +109,12 @@
    :history nil})
 
 (defn generate-system
-  "take a system + params, return a state"
-  [l-system iterations]
-  (let [next-symbols (make-symbols-iterator l-system)
-        moves (transform-n-times next-symbols iterations (:start l-system))]
-    (apply-moves default-state l-system moves)))
+  "take an l system and number of iterations, return a state"
+  [{:keys [rules start handlers]} iterations]
+  (let [next-symbols (make-symbols-iterator rules)
+        generations (iterate next-symbols start)
+        moves (nth generations iterations)]
+    (apply-moves default-state handlers moves)))
 
 (def test-gen (generate-system koch-curve 4))
 
