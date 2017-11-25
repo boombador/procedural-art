@@ -1,5 +1,2 @@
-(ns procedural-art.lsytems)
-
-
-
+(ns procedural-art.lsystems)
 
