@@ -3,6 +3,10 @@
 
 (def svg-side "300")
 
+(defn label-str
+  [label s]
+  (str label ": " s "\n"))
+
 (defn show-debug [{:keys [heading step-size] :as state}]
   [:div 
    [:h1 "System Debug"]
@@ -49,7 +53,19 @@
                                     (map scaler)
                                     s/polyline)))))
 
-(defn slider [param value min max handler]
+(defn slider [value min max handler]
   [:input {:type "range" :value value :min min :max max
            :style {:width "100%"}
            :on-change handler}])
+
+(defn parameter-controls
+  [{:keys [angle iterations l-system]} app-state]
+  [:div {:style {:width "50%"
+                 :float "left"}}
+   (slider angle 0 90 (fn [e]
+                        (let [val (.-target.value e)]
+                          (swap! app-state assoc-in [:system-parameters :angle] val))))
+   (slider iterations 1 4 (fn [e]
+                            (let [val (.-target.value e)
+                                  num (js/parseInt val)]
+                              (swap! app-state assoc-in [:system-parameters :iterations] num))))])

@@ -34,7 +34,6 @@
    body])
 
 (defn svg-view [{:keys [side]} body]
-  (println side)
   [:svg {:width side
          :height side
          :viewBox (str "0 0 " side " " side)}
