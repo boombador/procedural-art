@@ -19,6 +19,11 @@
         (update-in [:pos :x] #(+ % dx))
         (update-in [:pos :y] #(+ % dy)))))
 
+(def default-state {:pos {:x 0 :y 0}
+                    :heading 0
+                    :step-size 1
+                    :history nil})
+
 (def koch-curve
   {:id "koch-curve"
    :logic {:start [:f]
@@ -28,23 +33,24 @@
    :render {:handlers {:f forward
                        :+ (fn [{:keys [angle]} state] (turn state (to-radians angle)))
                        :- (fn [{:keys [angle]} state] (turn state (to-radians (- angle))))}
-            :state {:pos {:x 0 :y 0}
-                    :heading 0
-                    :step-size 1
-                    :history nil}
+            :state default-state
             :params {:angle 90
-                     :iterations 1}}})
+                     :iterations 2}}})
 
 (def sierpinski-arrowhead
-  {:start [:a]
-   :rules {:a [:b :- :a :- :b]
-           :b [:a :+ :b :+ :a]
-           :- [:-]
-           :+ [:+]}
-   :handlers {:a forward
-              :b forward
-              :+ (fn [state] (turn state (to-radians 60)))
-              :- (fn [state] (turn state (to-radians -60)))}})
+  {:id "sierpinski-arrowhead"
+   :logic {:start [:a]
+           :rules {:a [:b :- :a :- :b]
+                   :b [:a :+ :b :+ :a]
+                   :- [:-]
+                   :+ [:+]}}
+   :render {:handlers {:a forward
+                       :b forward
+                       :+ (fn [state] (turn state (to-radians 60)))
+                       :- (fn [state] (turn state (to-radians -60)))}
+            :state default-state
+            :params {:angle 90
+                     :iterations 2}}})
 
 (def dragon-curve
   {:start [:f :x]
@@ -55,4 +61,5 @@
               :- (fn [state] (turn state (to-radians -90)))}})
 
 (def all-systems
-  [koch-curve])
+  [koch-curve
+   sierpinski-arrowhead])

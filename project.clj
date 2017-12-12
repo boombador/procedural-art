@@ -12,7 +12,8 @@
                  [org.clojure/clojurescript "1.9.946"]
                  [org.clojure/core.async  "0.3.443"]
                  [quil "2.6.0"]
-                 [reagent "0.7.0"]]
+                 [reagent "0.7.0"]
+                 [cljsjs/react-bootstrap "0.31.5-0"]]
 
   :plugins [[lein-figwheel "0.5.14"]
             [lein-cljsbuild "1.1.7" :exclusions [[org.clojure/clojure]]]]
