@@ -5,17 +5,6 @@
 
 (def svg-side "300")
 
-(defn label-str
-  [label s]
-  (str label ": " s "\n"))
-
-(defn show-debug [{:keys [heading step-size] :as state}]
-  [:div 
-   [:h1 "System Debug"]
-   [:div (label-str "Heading" heading)]
-   [:div (label-str "Step Size" step-size)]
-   (show-history state)])
-
 (defn view-pos
   [idx {:keys [x y]}]
   (let [s (str "<" x ", " y ">")]
@@ -30,12 +19,6 @@
              :max-y (if (> y max-y) y max-y)})
           {:max-x 0 :max-y 0}
           points))
-
-(defn show-history [state]
-  (let [points (extract-points state)]
-    [:div
-     [:div "History"]
-     (map-indexed view-pos points)]))
 
 (defn make-point-scaler [scalar]
   (fn [p]
@@ -66,19 +49,6 @@
     [:a {:href source} "source code"]
     " of this project for more precise information, updates may be forthcoming."]])
 
-(defn interactive-l-system
-  [app-state params rendered]
-  (let [tile "L-System Generator" 
-        source "https://github.com/boombador/procedural-art"]
-    [:div
-     (navbar title source)
-     [:div.container {:style {:margin-top "60px"}}
-      [:div.row [:div.col-md-12 [:h1 "Interactive L-System"]]]
-      [:div.row 
-       [:div.col-md-4 (parameter-controls params app-state)]
-       [:div.col-md-8 {:style {:text-align "center"}} (state->svg rendered)]]
-      (explainer source)]]))
-
 (defn state->svg [state]
   (let [points (extract-points state)
         {:keys [max-x max-y]} (get-max points)
@@ -89,6 +59,8 @@
                                (->> points
                                     (map scaler)
                                     s/polyline)))))
+
+
 
 (defn slider [label value min max handler]
   [:label {:style {:display "block"}}
@@ -118,3 +90,16 @@
                                    (-> e change-value to-int))))])
 
 (def Button (reagent/adapt-react-class (aget js/ReactBootstrap "Button")))
+
+(defn interactive-l-system
+  [app-state params rendered]
+  (let [title "L-System Generator" 
+        source "https://github.com/boombador/procedural-art"]
+    [:div
+     (navbar title source)
+     [:div.container {:style {:margin-top "60px"}}
+      [:div.row [:div.col-md-12 [:h1 "Interactive L-System"]]]
+      [:div.row 
+       [:div.col-md-4 (parameter-controls params app-state)]
+       [:div.col-md-8 {:style {:text-align "center"}} (state->svg rendered)]]
+      (explainer source)]]))

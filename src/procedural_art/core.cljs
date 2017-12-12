@@ -30,6 +30,9 @@
   [l-system-id]
   (nth (filter #(= l-system-id (:id %)) l/all-systems) 0))
 
+(defonce app-state (atom {:active-system-id "koch-curve"
+                          :system-parameters {:iterations 2 :angle 90}}))
+
 (defn load-l-system!
   [l-system-id]
   (swap! app-state
@@ -38,9 +41,6 @@
                (assoc :active-system-id l-system-id)
                (assoc :system-parameters (-> system :render :params))))
          (get-l-system l-system-id)))
-
-(defonce app-state (atom {:active-system-id "koch-curve"
-                          :system-parameters {:iterations 2 :angle 90}}))
 
 (defn page-l-system []
   (let [{params :system-parameters id :active-system-id} @app-state
