@@ -10,8 +10,13 @@
 
   :dependencies [[org.clojure/clojure "1.9.0-beta4"]
                  [org.clojure/clojurescript "1.9.946"]
+
+                 [compojure "1.6.0"]
+                 [ring/ring-core "1.6.2"]
+                 [ring/ring-jetty-adapter "1.6.2"]
+                 [ring/ring-defaults "0.3.1"]
+                 
                  [org.clojure/core.async  "0.3.443"]
-                 [quil "2.6.0"]
                  [reagent "0.7.0"]
                  [cljsjs/react-bootstrap "0.31.5-0"]]
 
@@ -105,4 +110,5 @@
                    :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}
                    ;; need to add the compliled assets to the :clean-targets
                    :clean-targets ^{:protect false} ["resources/public/js/compiled"
-                                                     :target-path]}})
+                                                     :target-path]}
+             :uberjar {:main server.core}})
